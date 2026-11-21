@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <!-- WinForms is used only for the secure-desktop password prompt -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>SecureVault.App</RootNamespace>
+    <AssemblyName>SecureVault</AssemblyName>
+    <StartupObject>SecureVault.App.Program</StartupObject>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <!-- No single-file self-extraction: libsodium.dll must sit next to the exe in Program Files, never in %TEMP% -->
+    <PublishSingleFile>false</PublishSingleFile>
+    <!-- Runtime feature switches: no DOTNET_STARTUP_HOOKS code injection; trimming-safe defaults -->
+    <StartupHookSupport>false</StartupHookSupport>
+    <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+    <!-- Needed only by the LibraryImport source generator; our own code has no unsafe blocks. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Keep WinForms out of global usings so WPF types are not ambiguous -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ApplicationDefinition Remove="App.xaml" />
+    <Page Include="App.xaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="[10.0.0]" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Vault.Core\Vault.Core.csproj" />
+  </ItemGroup>
+
+</Project>

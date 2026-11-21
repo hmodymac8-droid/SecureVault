@@ -1,0 +1,20 @@
+﻿<Project>
+  <PropertyGroup>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
+    <!-- Supply chain: pin exact resolved versions and fail on drift in CI -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- Windows-only app: one runtime identifier everywhere keeps the lock files consistent for locked-mode restores -->
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <!-- Reproducible builds -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+  </PropertyGroup>
+</Project>
+
