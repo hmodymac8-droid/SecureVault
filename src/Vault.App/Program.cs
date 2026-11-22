@@ -26,6 +26,15 @@ public static class Program
     [STAThread]
     public static int Main(string[] args)
     {
+        // 0. Browser native-messaging helper mode (started by Chrome/Edge with the extension origin as the first
+        //    argument). Its stdin/stdout belong to the browser, so it can't relaunch. It refuses to relay
+        //    anything if injection variables are set, holds no keys, and is hardened like the main app.
+        if (Browser.NativeHost.IsHostInvocation(args))
+        {
+            Hardening.ApplyEarly();
+            return Browser.NativeHost.Run(args, Browser.NativeHost.IsInjectionVariable);
+        }
+
         // 1. Clean environment. Relaunch ourselves with every runtime-injection variable (startup hooks,
         //    profilers, DOTNET_ROOT, ...) removed, and with diagnostics turned off: no debugger attach, no
         //    profiler, no diagnostic IPC pipe (which would let a same-user tool dump our memory). The first
@@ -48,7 +57,8 @@ public static class Program
         bool first;
         try { single = new Mutex(true, @"Local\SecureVault-SingleInstance", out first); }
         catch (UnauthorizedAccessException) { first = false; single = null!; }
-        if (!first)
+        bool selfTest = args.Contains("--selftest");
+        if (!first && !selfTest)
         {
             MessageBox.Show("SecureVault is already running.", "SecureVault", MessageBoxButton.OK, MessageBoxImage.Information);
             return 1;
@@ -57,7 +67,8 @@ public static class Program
         // 3. Harden the process before anything sensitive happens.
         Hardening.ApplyEarly();
 
-        if (args.Contains("--selftest")) return SelfTest.Run();
+        // The self-test may run while the real app is open; it then skips only the browser-bridge part.
+        if (selfTest) return SelfTest.Run(appAlreadyRunning: !first);
 
         var app = new App();
         app.InitializeComponent();
@@ -84,7 +95,12 @@ public static class Program
         psi.Environment["DOTNET_EnableDiagnostics"] = "0";
         psi.Environment[CleanMarker] = "1";
         using var p = Process.Start(psi)!;
-        if (args.Contains("--selftest")) { p.WaitForExit(); return p.ExitCode; }
+        if (args.Contains("--selftest"))
+        {
+            p.WaitForExit();
+            bool bridgeOk = SelfTest.RunBridgeChecksInLauncher(args);
+            return p.ExitCode != 0 ? p.ExitCode : bridgeOk ? 0 : 1;
+        }
         return 0;
     }
 }

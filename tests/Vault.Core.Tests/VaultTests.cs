@@ -368,6 +368,8 @@ public sealed class VaultTests : IDisposable
                 case 1: f = f[..rng.Next(f.Length)]; break;
                 default: { var extra = new byte[rng.Next(1, 64)]; rng.NextBytes(extra); f = [.. f, .. extra]; break; }
             }
+            // A random overwrite can write the value a byte already had; an unchanged file must open, so skip it.
+            if (f.AsSpan().SequenceEqual(orig)) continue;
             using var r = Req("correct horse battery staple");
             var ex = Record.Exception(() => VaultSession.Open(VaultPath, f, r, KdfPolicy.Testing).Dispose());
             Assert.True(ex is VaultAuthException or VaultFormatException, $"iter {n}: {ex?.ToString() ?? "opened!"}");

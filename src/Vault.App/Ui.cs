@@ -176,3 +176,27 @@ internal sealed class SessionGuard : IDisposable
         _main.StateChanged -= OnState;
     }
 }
+
+/// <summary>Shared master-password check for vault creation and password changes.</summary>
+internal static class MasterPasswordAdvice
+{
+    /// <summary>
+    /// True = use this password. Hard-minimum failures explain why and return false (ask again).
+    /// Weak/Fair passwords show the rating and tips and let the user decide; Good/Strong pass silently.
+    /// </summary>
+    public static bool Accept(Window owner, ReadOnlySpan<char> pw)
+    {
+        var r = PasswordStrength.CheckMaster(pw);
+        if (!r.Allowed)
+        {
+            MessageBox.Show(owner, r.Summary + "\n\n" + string.Join("\n\n", r.Tips), "Choose another password", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return false;
+        }
+        if (r.Rating >= StrengthRating.Good) return true;
+
+        string text = r.Summary + "\n\n" + string.Join("\n\n", r.Tips.Select(t => "• " + t)) +
+                      "\n\nUse this password anyway?\n(Yes = keep it; No = type a different one)";
+        return MessageBox.Show(owner, text, $"Password strength: {r.Rating}", MessageBoxButton.YesNo,
+                   r.Rating == StrengthRating.Weak ? MessageBoxImage.Warning : MessageBoxImage.Information, MessageBoxResult.No) == MessageBoxResult.Yes;
+    }
+}

@@ -34,14 +34,32 @@ public class MiscTests
         Assert.All(counts.Values, v => Assert.InRange(v, expected * 0.85, expected * 1.15));
     }
 
+    // Only the hard minimum blocks a password.
     [Theory]
-    [InlineData("password123456", false)]
-    [InlineData("aaaaaaaaaaaaaaaa", false)]
-    [InlineData("qwertyuiopasdfgh", false)]
-    [InlineData("short1!", false)]
-    [InlineData("tangerine-orbit-velvet-cactus", true)]
-    [InlineData("Xq7#mP2!vL9@wR4z", true)]
-    public void MasterPasswordStrength(string pw, bool ok) => Assert.Equal(ok, PasswordStrength.CheckMaster(pw).Ok);
+    [InlineData("short1!")]           // under 8 characters
+    [InlineData("aaaaaaaaaaaaaaaa")]  // one repeated character
+    [InlineData("Password")]          // a top common password
+    [InlineData("12345678")]
+    public void MasterPassword_HardMinimumBlocks(string pw) => Assert.False(PasswordStrength.CheckMaster(pw).Allowed);
+
+    // Everything else is allowed, with a rating and tips.
+    [Theory]
+    [InlineData("password123456", StrengthRating.Weak)]
+    [InlineData("qwertyuiopasdfgh", StrengthRating.Weak)]
+    [InlineData("sunflower", StrengthRating.Weak)]
+    [InlineData("tangerine-orbit-velvet-cactus", StrengthRating.Strong)]
+    [InlineData("Xq7#mP2!vL9@wR4z", StrengthRating.Strong)]
+    // Long ordinary sentences used to be rejected because neighbouring letters (st, de, on...) were penalised.
+    [InlineData("my dog loves the beach in summer", StrengthRating.Strong)]
+    [InlineData("I want to keep my stuff safe 2026", StrengthRating.Strong)]
+    [InlineData("bluehorsestandsonthehill", StrengthRating.Strong)]
+    public void MasterPassword_AllowedWithRating(string pw, StrengthRating expected)
+    {
+        var r = PasswordStrength.CheckMaster(pw);
+        Assert.True(r.Allowed);
+        Assert.Equal(expected, r.Rating);
+        if (expected < StrengthRating.Good) Assert.NotEmpty(r.Tips);
+    }
 
     [Fact]
     public void ProtectedText_RoundTrip_AndDisposedProtectorFails()

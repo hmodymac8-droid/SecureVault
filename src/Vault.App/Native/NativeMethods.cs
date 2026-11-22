@@ -65,6 +65,29 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool GetSecurityDescriptorDacl(nint sd, [MarshalAs(UnmanagedType.Bool)] out bool present, out nint dacl, [MarshalAs(UnmanagedType.Bool)] out bool defaulted);
 
+    // ── Browser bridge: identify the program on the other end of the pipe ──
+    public const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool GetNamedPipeClientProcessId(nint pipe, out uint pid);
+
+    [LibraryImport("kernel32.dll", SetLastError = true)]
+    public static partial nint OpenProcess(uint access, [MarshalAs(UnmanagedType.Bool)] bool inherit, uint pid);
+
+    [LibraryImport("kernel32.dll", SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool QueryFullProcessImageNameW(nint process, uint flags, [Out] char[] name, ref int size);
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct PROCESS_BASIC_INFORMATION
+    {
+        public nint ExitStatus, PebBaseAddress, AffinityMask, BasePriority, UniqueProcessId, InheritedFromUniqueProcessId;
+    }
+
+    [LibraryImport("ntdll.dll")]
+    public static partial int NtQueryInformationProcess(nint process, int infoClass, out PROCESS_BASIC_INFORMATION info, int length, out int returned);
+
     [StructLayout(LayoutKind.Sequential)]
     public struct SECURITY_ATTRIBUTES
     {

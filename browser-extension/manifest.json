@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "SecureVault",
+  "version": "1.0.0",
+  "description": "Fill logins from your local SecureVault. Fills only on the exact saved site, only when you click.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoxLdwwSdkKZVVUvSRFrsVWAG66v4hWlKLOk3T7s4fBQyKSZbYk4i9kJPvTZDUpKvWOsvE5dxSyHCi9cuIUaDpUKe+sTOKR2dK6hv8aXvfu10h8UsJrR/idV1HTTXhHXkXMBpiSS+4MRbIaCN4LKFgyXioKRq+1x1kvlw514XSzggSsindq6cfA3LemOzYZHS0ZhSyNuIEAfejpA3if1NJEjImv3+GJOJ+vhP/4WAhWTczfireX5NJG0KXGep4IKz/emCT4A4LwctTYo52M5oSy4DRVSA48vdwdPP7C4UBHMrUygB17tvoFQpZCD2zwwUFJ+M135JBtFK6fHu6VU7pQIDAQAB",
+  "minimum_chrome_version": "127",
+  "permissions": ["nativeMessaging", "scripting", "activeTab"],
+  "host_permissions": ["https://*/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "SecureVault", "default_popup": "popup.html" },
+  "content_scripts": [
+    { "matches": ["https://*/*"], "js": ["detect.js"], "run_at": "document_idle", "all_frames": false }
+  ],
+  "content_security_policy": { "extension_pages": "script-src 'self'; object-src 'self'" }
+}

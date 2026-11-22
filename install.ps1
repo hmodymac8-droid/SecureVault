@@ -35,7 +35,7 @@ New-Item -ItemType Directory -Path $build | Out-Null
 Set-AdminOnly $build
 
 # Copy sources only: no bin/obj/publish, and no stray build-customisation files.
-$items = 'src', 'tests', 'Directory.Build.props', 'SecureVault.slnx'
+$items = 'src', 'tests', 'browser-extension', 'Directory.Build.props', 'SecureVault.slnx'
 foreach ($i in $items) { Copy-Item (Join-Path $repo $i) $build -Recurse }
 Get-ChildItem $build -Recurse -Directory -Include bin, obj | Remove-Item -Recurse -Force
 $unexpected = Get-ChildItem $build -Recurse -File -Include 'Directory.Build.targets', 'Directory.Packages.props', 'nuget.config', '*.rsp'
@@ -64,6 +64,24 @@ try {
     if (Test-Path $target) { Remove-Item $target -Recurse -Force }
     New-Item -ItemType Directory -Path $target | Out-Null
     Copy-Item (Join-Path $out '*') $target -Recurse
+    Copy-Item (Join-Path $build 'browser-extension') $target -Recurse
+
+    # Browser native-messaging registration (HKLM, written by this admin script). Only the SecureVault
+    # extension ID may launch the helper, and the manifest sits in admin-only Program Files.
+    $extId = 'mipbfgbdnkehbkfcocihjcilaflfphih'
+    $hostJson = Join-Path $target 'native-host.json'
+    [ordered]@{
+        name            = 'com.securevault.host'
+        description     = 'SecureVault browser helper'
+        path            = (Join-Path $target 'SecureVault.exe')
+        type            = 'stdio'
+        allowed_origins = @("chrome-extension://$extId/")
+    } | ConvertTo-Json | Set-Content $hostJson -Encoding ASCII
+    foreach ($k in 'HKLM:\SOFTWARE\Google\Chrome\NativeMessagingHosts\com.securevault.host',
+                   'HKLM:\SOFTWARE\Microsoft\Edge\NativeMessagingHosts\com.securevault.host') {
+        New-Item -Path $k -Force | Out-Null
+        Set-Item -Path $k -Value $hostJson
+    }
     # Admins/SYSTEM full; users and app containers read+execute only.
     icacls $target /inheritance:r /grant:r "*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F" "*S-1-5-32-545:(OI)(CI)RX" "*S-1-15-2-1:(OI)(CI)RX" | Out-Null
 }

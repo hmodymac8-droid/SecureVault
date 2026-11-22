@@ -77,6 +77,39 @@ Then delete any old `history.json` entries that may hold passwords.
 
 Opening an old copy triggers the rollback warning: that's expected for a restore you did yourself. TPM unlock methods only work on the PC that created them. On a new PC, open with your password slot or the recovery key, then add a TPM unlock there.
 
+## Browser extension (Chrome / Edge)
+
+**Setup (one time):**
+1. Run `install.ps1`. It copies the extension to `C:\Program Files\SecureVault\browser-extension` and registers the browser connection.
+2. Load the extension:
+   - Open `chrome://extensions` (Edge: `edge://extensions`) and turn on **Developer mode**.
+   - Click **Load unpacked** and choose that folder.
+   - Check the ID is `mipbfgbdnkehbkfcocihjcilaflfphih`.
+3. In SecureVault, open **Security**, tick **Allow the SecureVault browser extension**, and click **Save settings**.
+
+**Using it:**
+- On a site where you have a saved login, the SecureVault icon shows a number and a small **"🔒 SecureVault: click to fill"** chip appears near the password box.
+- Click the chip (or the icon), then pick the login.
+- SecureVault asks **Allow / Deny** (you can turn that off), then fills it in.
+- The entry's **URL** must be the site's address, e.g. `github.com`.
+
+**Why it's safe:**
+| Risk | Protection |
+|---|---|
+| Fake or look-alike sites (phishing) | Fills only on the **exact** saved host, https only, compared in punycode (Cyrillic look-alikes never match). No subdomain wildcards. **Checked inside SecureVault**, not by the extension. |
+| Hidden forms and clickjacking | Never fills automatically. The in-page chip never fills anything itself: it only opens the browser's own popup, which a page can't cover, and clicks faked by the page are ignored. Fills the top frame only, after re-checking the page's origin. |
+| Web pages reading your data | The chip shows no usernames. The extension's popup and code aren't reachable from pages (no web-accessible resources, no external messaging). |
+| Asking for another site's password | SecureVault refuses: `get` only works for an entry that matches the requesting site, and it answers the same whether the entry exists or not. |
+| Other programs posing as the extension | Only the extension with our ID may start the helper (the native-messaging manifest is in Program Files, registered in HKLM). SecureVault accepts a connection only from its own helper exe, started by `chrome.exe` / `msedge.exe`, over a pipe ACL'd to your user and closed to the network. There's a rate limit, and you approve each fill. |
+| A locked vault | The bridge only runs while the vault is unlocked **and** you've turned browser filling on. |
+| Privacy | A site is sent to SecureVault (locally) only when the page has a login form, and only to get a count. Nothing goes to the internet. |
+
+**Limits:**
+- Unpacked extensions show a "developer mode" notice in Chrome.
+- Malware running as you could install a look-alike extension in your browser (see the threat model).
+- Once a password is filled into a page, that page has it, as with any password manager.
+- Keep SecureVault open (not minimized, or turn off "Lock when minimized") while browsing.
+
 ## Importing from a browser
 Use **Import CSV** (Chrome, Edge, Firefox and Bitwarden formats). Exports are **plaintext**: import, then delete the CSV. On SSDs, "secure delete" can't guarantee the data is gone, so consider changing your most important passwords afterwards.
 

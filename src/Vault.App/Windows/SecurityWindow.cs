@@ -28,6 +28,8 @@ internal sealed class SecurityWindow : HardenedWindow
     private readonly TextBox _autoLock = new() { Width = 60 }, _clip = new() { Width = 60 }, _backups = new() { Width = 60 };
     private readonly CheckBox _lockMin = new() { Content = "Lock when minimized" };
     private readonly CheckBox _secureDesk = new() { Content = "Use the secure desktop for password entry" };
+    private readonly CheckBox _browser = new() { Content = "Allow the SecureVault browser extension (Chrome / Edge) to fill logins" };
+    private readonly CheckBox _browserConfirm = new() { Content = "Ask me here before every browser fill (recommended)", Margin = new Thickness(28, 2, 4, 6) };
 
     public SecurityWindow(VaultSession s, AppConfig config, Window owner)
     {
@@ -58,6 +60,10 @@ internal sealed class SecurityWindow : HardenedWindow
         _backups.Text = st.MaxBackups.ToString(System.Globalization.CultureInfo.InvariantCulture);
         _lockMin.IsChecked = st.LockOnMinimize;
         _secureDesk.IsChecked = config.UseSecureDesktop;
+        _browser.IsChecked = st.BrowserEnabled;
+        _browserConfirm.IsChecked = st.BrowserConfirmEachFill;
+        var browserHelp = new Button { Content = "Set up the browser extension…", HorizontalAlignment = HorizontalAlignment.Left };
+        browserHelp.Click += (_, _) => ShowBrowserSetup();
         var save = B("Save settings", SaveSettings);
         var close = new Button { Content = "Close", IsCancel = true };
 
@@ -82,6 +88,9 @@ internal sealed class SecurityWindow : HardenedWindow
                 Row("Clear clipboard after", _clip, "seconds"),
                 Row("Encrypted backups to keep", _backups, $"(in {VaultFile.BackupDirectory(s.Path)})"),
                 _lockMin, _secureDesk,
+                H("Browser"),
+                Note("Fills only on the exact website saved in an entry's URL (https only), only when you click, and only while the vault is unlocked. Keep SecureVault open (not minimized, or turn off \"Lock when minimized\")."),
+                _browser, _browserConfirm, browserHelp,
                 new TextBlock { Foreground = Brushes.Gray, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(4, 8, 4, 4), Text =
                     "Process hardening applied: " + string.Join(", ", Hardening.Applied) + (Hardening.Failed.Count > 0 ? ". Not applied: " + string.Join(", ", Hardening.Failed) : "") },
                 new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Children = { save, close } },
@@ -227,12 +236,10 @@ internal sealed class SecurityWindow : HardenedWindow
         {
             while (true)
             {
-                n1 = await PasswordInput.AskAsync(this, "New master password", $"Choose a NEW master password (at least {PasswordStrength.MinLength} characters).", _config.UseSecureDesktop);
+                n1 = await PasswordInput.AskAsync(this, "New master password", $"Choose a NEW master password (at least {PasswordStrength.MinLength} characters). Tip: 4–5 random words make a strong, memorable one.", _config.UseSecureDesktop);
                 if (n1 is null) return;
-                var (ok, msg) = PasswordStrength.CheckMaster(n1);
-                if (ok) break;
+                if (MasterPasswordAdvice.Accept(this, n1)) break;
                 VaultCrypto.Wipe(n1);
-                MessageBox.Show(this, msg, "Too weak");
             }
             n2 = await PasswordInput.AskAsync(this, "Confirm", "Type the new master password again.", _config.UseSecureDesktop);
             if (n2 is null || !n1.AsSpan().SequenceEqual(n2)) { MessageBox.Show(this, "The passwords don't match."); return; }
@@ -270,6 +277,27 @@ internal sealed class SecurityWindow : HardenedWindow
         finally { VaultCrypto.Wipe(pw); if (kf is not null) VaultCrypto.Wipe(kf); }
     }
 
+    private void ShowBrowserSetup()
+    {
+        string folder = Path.Combine(AppContext.BaseDirectory, "browser-extension");
+        bool registered = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Google\Chrome\NativeMessagingHosts\" + Browser.BrowserIds.HostName) is not null
+                       || Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Edge\NativeMessagingHosts\" + Browser.BrowserIds.HostName) is not null;
+        string msg =
+            "To add the extension (one time):\n\n" +
+            "1. In Chrome open chrome://extensions (in Edge: edge://extensions).\n" +
+            "2. Turn on \"Developer mode\" (top right in Chrome, left side in Edge).\n" +
+            "3. Click \"Load unpacked\" and choose this folder:\n   " + folder + "\n" +
+            "4. Check the ID shown is  " + Browser.BrowserIds.ExtensionId + "\n" +
+            "   (if it's different, it isn't our extension: remove it).\n" +
+            "5. Pin the SecureVault icon to the toolbar.\n\n" +
+            "Then tick \"Allow the SecureVault browser extension\" here and click Save settings.\n\n" +
+            "The extension folder is in Program Files, so other programs can't change its code." +
+            (registered ? "" : "\n\n⚠ The browser connection isn't registered. Re-run install.ps1 as administrator.") +
+            "\n\nOpen the extension folder now?";
+        if (MessageBox.Show(this, msg, "Browser extension setup", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes && Directory.Exists(folder))
+            System.Diagnostics.Process.Start("explorer.exe", "\"" + folder + "\"");
+    }
+
     private Task SaveSettings()
     {
         var st = _s.Data.Settings;
@@ -277,7 +305,10 @@ internal sealed class SecurityWindow : HardenedWindow
         if (!int.TryParse(_clip.Text, out int c) || c is < 5 or > 120) throw new ArgumentException("Clipboard clear must be 5 to 120 seconds.");
         if (!int.TryParse(_backups.Text, out int b) || b is < 0 or > 50) throw new ArgumentException("Backups must be 0 to 50.");
         st.AutoLockMinutes = a; st.ClipboardClearSeconds = c; st.MaxBackups = b; st.LockOnMinimize = _lockMin.IsChecked == true;
+        st.BrowserEnabled = _browser.IsChecked == true;
+        st.BrowserConfirmEachFill = _browserConfirm.IsChecked == true;
         _s.Save();
+        (Owner as MainWindow)?.UpdateBrowserBridge();
         _config.UseSecureDesktop = _secureDesk.IsChecked == true;
         _config.Save();
         MessageBox.Show(this, "Settings saved.", "SecureVault");

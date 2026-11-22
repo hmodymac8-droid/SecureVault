@@ -123,13 +123,11 @@ public sealed class MainWindow : HardenedWindow
             while (true)
             {
                 pw = await PasswordInput.AskAsync(this, "New master password",
-                    $"Choose a master password (at least {PasswordStrength.MinLength} characters; several random words are ideal). It can't be recovered without your recovery key.",
+                    $"Choose a master password (at least {PasswordStrength.MinLength} characters). Tip: 4–5 random words make a strong, memorable one. Only your recovery key can reset it.",
                     _config.UseSecureDesktop);
                 if (pw is null) return;
-                var (ok, msg) = PasswordStrength.CheckMaster(pw);
-                if (ok) break;
+                if (MasterPasswordAdvice.Accept(this, pw)) break;
                 VaultCrypto.Wipe(pw);
-                MessageBox.Show(this, msg, "Master password too weak", MessageBoxButton.OK, MessageBoxImage.Warning);
             }
             again = await PasswordInput.AskAsync(this, "Confirm master password", "Type the master password again.", _config.UseSecureDesktop);
             if (again is null) return;
@@ -350,6 +348,17 @@ public sealed class MainWindow : HardenedWindow
         s.Saved += RollbackGuard.Record;
         RollbackGuard.Record(s.Header);
         _guard.ResetIdle();
+        UpdateBrowserBridge();
+    }
+
+    private Browser.BrowserBridge? _bridge;
+
+    /// <summary>The browser bridge runs only while the vault is unlocked AND browser filling is turned on.</summary>
+    internal void UpdateBrowserBridge()
+    {
+        bool want = _session is { IsLocked: false } s && s.Data.Settings.BrowserEnabled;
+        if (want && _bridge is null) _bridge = new Browser.BrowserBridge(this, () => _session, Flash);
+        else if (!want && _bridge is not null) { _bridge.Dispose(); _bridge = null; }
     }
 
     // ───────────────────────────── Vault view ─────────────────────────────
@@ -462,6 +471,7 @@ public sealed class MainWindow : HardenedWindow
         foreach (Window w in Application.Current.Windows.Cast<Window>().ToList())
             if (w != this) try { w.Close(); } catch { /* closing during shutdown */ }
         IsLocking = false;
+        _bridge?.Dispose(); _bridge = null;
         SecureClipboard.ClearIfOurs();
         _rows.Clear();
         _search.Text = "";

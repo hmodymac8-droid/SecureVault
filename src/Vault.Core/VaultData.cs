@@ -23,6 +23,10 @@ public sealed class VaultSettings
     public int MaxBackups { get; set; } = 5;
     /// <summary>A recovery key was issued but the user hasn't confirmed saving it. A new one is issued at the next unlock.</summary>
     public bool RecoveryKitPending { get; set; }
+    /// <summary>The browser extension may talk to this vault. Off by default.</summary>
+    public bool BrowserEnabled { get; set; }
+    /// <summary>Ask in SecureVault before every browser fill. On by default.</summary>
+    public bool BrowserConfirmEachFill { get; set; } = true;
 
     internal void Clamp()
     {
@@ -58,6 +62,8 @@ internal static class VaultDataSerializer
         w.WriteBoolean("lockOnMinimize", data.Settings.LockOnMinimize);
         w.WriteNumber("maxBackups", data.Settings.MaxBackups);
         w.WriteBoolean("recoveryKitPending", data.Settings.RecoveryKitPending);
+        w.WriteBoolean("browserEnabled", data.Settings.BrowserEnabled);
+        w.WriteBoolean("browserConfirmEachFill", data.Settings.BrowserConfirmEachFill);
         w.WriteEndObject();
         w.WriteStartArray("entries");
         foreach (var e in data.Entries)
@@ -120,6 +126,8 @@ internal static class VaultDataSerializer
                 case "lockOnMinimize": s.LockOnMinimize = r.GetBoolean(); break;
                 case "maxBackups": s.MaxBackups = r.GetInt32(); break;
                 case "recoveryKitPending": s.RecoveryKitPending = r.GetBoolean(); break;
+                case "browserEnabled": s.BrowserEnabled = r.GetBoolean(); break;
+                case "browserConfirmEachFill": s.BrowserConfirmEachFill = r.GetBoolean(); break;
                 default: r.Skip(); break;
             }
         }
